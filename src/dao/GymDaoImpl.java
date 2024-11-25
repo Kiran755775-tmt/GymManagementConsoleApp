@@ -1,57 +1,52 @@
 package dao;
 
-import java.util.logging.Logger;
-
 import exception.InvalidQueryException;
 import model.Member;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.sql.*;
+import java.util.logging.Logger;
 
 public class GymDaoImpl implements GymDao {
     private static final Logger logger = Logger.getLogger(GymDaoImpl.class.getName());
-    static Connection connection;
-
-    static {
-        connection = ConnectorFactory.getConnection();
-    }
-
     //NEW REGISTRATION AND UPGRADATION QUERIES
     private static final String INSERT_QUERY = "insert into members (member_id,name,contact_info,membership_type,membership_start_date,membership_end_date) values(?,?,?,?,?,?)";
     private static final String UPDATE_QUERY = "update members set membership_type= ? where member_id = ?";
     private static final String GET_MEMBER_BY_ID_QUERY = "select* from members where member_id=?";
     private static final String GET_CLASS_ID_QUERY = "select class_id from classes where class_name=?";
-
     //BOOK AND CANCEL BOOKING QUERIES
     private static final String BOOK_QUERY = "insert into bookings(class_id,seats_booked,member_id,booking_date) values(?,?,?,? )";
     private static final String SEATS_AVAILABLE_QUERY = "select total_seats,booked_seats from classes where class_id=?";
     private static final String CHANGING_SEATS_QUERY = "update classes set booked_seats=? where class_id=?";
     private static final String SELECT_CLASS_ID_QUERY = "select* from bookings where booking_id=?";
     private static final String CANCEL_BOOKING_QUERY = "delete from bookings where booking_id=?";
-
     //RETRIEVING MEMBER DETAILS QUERIES
     private static final String RETRIEVE_MEMBERSHIP_DETAILS_QUERY = "select member_id,name,contact_info,membership_type,membership_start_date,membership_end_date from members where member_id=?";
     private static final String RETRIEVE_BOOKING_DETAILS_QUERY = "select b.booking_id,c.class_name, b.seats_booked, b.booking_date from bookings b join classes c on b.class_id= c.class_id where member_id=?";
-
     // GENERATING REPORT QUERIES
     private static final String RETRIEVE_ACTIVE_MEMBERS_QUERY = "select count(*) from members where membership_end_date>curdate()";
     private static final String RETRIEVE_MOST_BOOKED_CLASS_QUERY = "select c.class_name, b.seats_booked from bookings b join classes c on b.class_id= c.class_id  order by b.seats_booked desc limit 1";
     private static final String RETRIEVE_MEMBERSHIP_TYPE_DISTRIBUTION_QUERY = "select membership_type, count(*) from members group by membership_type";
+    static Connection connection;
 
+    static {
+        connection = ConnectorFactory.getConnection();
+    }
 
     //REGISTERING NEW USER
     @Override
     public void registerNewMember(Member member) {
-        try (
-                PreparedStatement preparedStatement = connection.prepareStatement(INSERT_QUERY)
-        ) {
-            preparedStatement.setInt(1, member.getMemberId());
-            preparedStatement.setString(2, member.getMemberName());
-            preparedStatement.setString(3, member.getMailId());
-            preparedStatement.setString(4, member.getMembershipType());
-            preparedStatement.setDate(5, member.getMembershipStartDate());
-            preparedStatement.setDate(6, member.getGetMembershipEndDate());
-            int rowsAffected = preparedStatement.executeUpdate();
+        try (PreparedStatement registerMemberStatement = connection.prepareStatement(INSERT_QUERY)) {
+            registerMemberStatement.setInt(1, member.getMemberId());
+            registerMemberStatement.setString(2, member.getMemberName());
+            registerMemberStatement.setString(3, member.getMailId());
+            registerMemberStatement.setString(4, member.getMembershipType());
+            registerMemberStatement.setDate(5, member.getMembershipStartDate());
+            registerMemberStatement.setDate(6, member.getGetMembershipEndDate());
+            int rowsAffected = registerMemberStatement.executeUpdate();
             if (rowsAffected > 0) {
                 System.out.println("Your new membership has been registered Succesfully");
             }
@@ -64,12 +59,10 @@ public class GymDaoImpl implements GymDao {
     //CHECKS WHETHER GIVEN MEMBER ID IS PRESENT OR NOT IN MEMBERS TABLE
     @Override
     public boolean getMemberById(int memberId) {
-        try (
-                PreparedStatement preparedStatement = connection.prepareStatement(GET_MEMBER_BY_ID_QUERY)
-        ) {
-            preparedStatement.setInt(1, memberId);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            if (resultSet.next()) {
+        try (PreparedStatement checkMemberByIdStatement = connection.prepareStatement(GET_MEMBER_BY_ID_QUERY)) {
+            checkMemberByIdStatement.setInt(1, memberId);
+            ResultSet memberResultSet = checkMemberByIdStatement.executeQuery();
+            if (memberResultSet.next()) {
                 return true;
             }
 
@@ -82,12 +75,10 @@ public class GymDaoImpl implements GymDao {
     //CHECKS WHETHER GIVEN BOOKING ID IS PRESENT OR NOT IN  BOOKINGS TABLE
     @Override
     public boolean exitsBookingId(int bookingId) {
-        try (
-                PreparedStatement preparedStatement = connection.prepareStatement(SELECT_CLASS_ID_QUERY)
-        ) {
-            preparedStatement.setInt(1, bookingId);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            if (resultSet.next()) {
+        try (PreparedStatement checkBookingByIdStatement = connection.prepareStatement(SELECT_CLASS_ID_QUERY)) {
+            checkBookingByIdStatement.setInt(1, bookingId);
+            ResultSet bookingResultSet = checkBookingByIdStatement.executeQuery();
+            if (bookingResultSet.next()) {
                 return true;
             }
         } catch (SQLException e) {
@@ -99,14 +90,12 @@ public class GymDaoImpl implements GymDao {
     //method to fetch available seats for a given class id.
     @Override
     public int getAvailableSeats(int classId) {
-        try (
-                PreparedStatement preparedStatement = connection.prepareStatement(SEATS_AVAILABLE_QUERY)
-        ) {
-            preparedStatement.setInt(1, classId);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            if (resultSet.next()) {
-                int totalSeats = resultSet.getInt("total_seats");
-                int bookedSeats = resultSet.getInt("booked_seats");
+        try (PreparedStatement fetchAvailableSeatsStatement = connection.prepareStatement(SEATS_AVAILABLE_QUERY)) {
+            fetchAvailableSeatsStatement.setInt(1, classId);
+            ResultSet seatsResultSet = fetchAvailableSeatsStatement.executeQuery();
+            if (seatsResultSet.next()) {
+                int totalSeats = seatsResultSet.getInt("total_seats");
+                int bookedSeats = seatsResultSet.getInt("booked_seats");
                 return totalSeats - bookedSeats;//return available seats
             }
 
@@ -120,12 +109,10 @@ public class GymDaoImpl implements GymDao {
     //method to update the seats for a given class id
 
     private void updateBookedSeats(int classId, int newBookedSeats) {
-        try (
-                PreparedStatement preparedStatement = connection.prepareStatement(CHANGING_SEATS_QUERY)
-        ) {
-            preparedStatement.setInt(1, newBookedSeats);
-            preparedStatement.setInt(2, classId);
-            preparedStatement.executeUpdate();
+        try (PreparedStatement updateSeatsStatement = connection.prepareStatement(CHANGING_SEATS_QUERY)) {
+            updateSeatsStatement.setInt(1, newBookedSeats);
+            updateSeatsStatement.setInt(2, classId);
+            updateSeatsStatement.executeUpdate();
         } catch (SQLException e) {
             throw new InvalidQueryException("Sql Query syntax is not valid");
         }
@@ -134,12 +121,11 @@ public class GymDaoImpl implements GymDao {
     //EXTRACTS CLASS ID USING CLASS NAME FROM CLASSES TABLE
     @Override
     public int getClassIdByName(String className) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(GET_CLASS_ID_QUERY)) {
-            preparedStatement.setString(1, className);
-            ResultSet resultSet = preparedStatement.executeQuery();
-            if (resultSet.next()) {
-                return resultSet.getInt("class_id");
+        try (PreparedStatement fetchClassIdStatement = connection.prepareStatement(GET_CLASS_ID_QUERY)) {
+            fetchClassIdStatement.setString(1, className);
+            ResultSet classResultSet = fetchClassIdStatement.executeQuery();
+            if (classResultSet.next()) {
+                return classResultSet.getInt("class_id");
             }
         } catch (SQLException e) {
             logger.severe("Error while extracting class id " + e.getMessage());
@@ -151,23 +137,22 @@ public class GymDaoImpl implements GymDao {
     //BOOKING A  CLASS USING CLASS ID, NO OF SEATS, MEMBER ID
     @Override
     public void bookClass(String className, int noOfSeats, int memberId) {
-        try (PreparedStatement preparedStatement = connection.prepareStatement(BOOK_QUERY);//this statement inserts data into books
-             PreparedStatement selectSeatsStmt = connection.prepareStatement(SEATS_AVAILABLE_QUERY)
-        ) {
+        try (PreparedStatement bookClassStatement = connection.prepareStatement(BOOK_QUERY);//this statement inserts data into books
+             PreparedStatement checkSeatsStatement = connection.prepareStatement(SEATS_AVAILABLE_QUERY)) {
             int classId = getClassIdByName(className);
-            selectSeatsStmt.setInt(1, classId);
-            ResultSet resultSet = selectSeatsStmt.executeQuery();
-            if (resultSet.next()) {
-                int bookedSeats = resultSet.getInt("booked_seats");
+            checkSeatsStatement.setInt(1, classId);
+            ResultSet seatsResultSet = checkSeatsStatement.executeQuery();
+            if (seatsResultSet.next()) {
+                int bookedSeats = seatsResultSet.getInt("booked_seats");
                 // Updating the booked seats by adding the new bookings
                 updateBookedSeats(classId, bookedSeats + noOfSeats); // Update with new booked seats count
             }
             //inserting data into bookings
-            preparedStatement.setInt(1, classId);
-            preparedStatement.setInt(2, noOfSeats);
-            preparedStatement.setInt(3, memberId);
-            preparedStatement.setTimestamp(4, new Timestamp(System.currentTimeMillis()));
-            preparedStatement.executeUpdate();
+            bookClassStatement.setInt(1, classId);
+            bookClassStatement.setInt(2, noOfSeats);
+            bookClassStatement.setInt(3, memberId);
+            bookClassStatement.setTimestamp(4, new Timestamp(System.currentTimeMillis()));
+            bookClassStatement.executeUpdate();
             System.out.println("Your class has been booked successfully ");
         } catch (SQLException e) {
             logger.severe("Error booking class: " + e.getMessage());
@@ -179,30 +164,26 @@ public class GymDaoImpl implements GymDao {
     //CANCELLING A CLASS USING BOOKING ID
     @Override
     public void cancelBooking(int bookingId) {
-        try (PreparedStatement preparedStatement = connection.prepareStatement(SELECT_CLASS_ID_QUERY);
-             PreparedStatement preparedStatement1 = connection.prepareStatement(CANCEL_BOOKING_QUERY);
-             PreparedStatement preparedStatement2 = connection.prepareStatement(SEATS_AVAILABLE_QUERY);
-             PreparedStatement preparedStatement3 = connection.prepareStatement(CHANGING_SEATS_QUERY)
-        ) {
-            preparedStatement.setInt(1, bookingId);
-            ResultSet resultSet = preparedStatement.executeQuery();
+        try (PreparedStatement fetchBookingDetailsStatement = connection.prepareStatement(SELECT_CLASS_ID_QUERY); PreparedStatement cancelBookingStatement = connection.prepareStatement(CANCEL_BOOKING_QUERY); PreparedStatement fetchSeatsStatement = connection.prepareStatement(SEATS_AVAILABLE_QUERY); PreparedStatement updateSeatsStatement = connection.prepareStatement(CHANGING_SEATS_QUERY)) {
+            fetchBookingDetailsStatement.setInt(1, bookingId);
+            ResultSet bookingDetailsResultSet = fetchBookingDetailsStatement.executeQuery();
 
-            if (resultSet.next()) {
+            if (bookingDetailsResultSet.next()) {
                 //extracting class id using booking id
-                int classId = resultSet.getInt("class_id");
-                //executing preparedStatement2 to extract booked_seats
-                preparedStatement2.setInt(1, classId);
-                ResultSet resultSet1 = preparedStatement2.executeQuery();
-                if (resultSet1.next()) {
+                int classId = bookingDetailsResultSet.getInt("class_id");
+                //executing fetchSeatsStatement to extract booked_seats
+                fetchSeatsStatement.setInt(1, classId);
+                ResultSet seatsResultSet = fetchSeatsStatement.executeQuery();
+                if (seatsResultSet.next()) {
                     //removing the seats booked in present booking from booked seats
-                    int bookedSeats = resultSet1.getInt("booked_seats");
-                    int seatsBookedNow = resultSet.getInt("seats_booked");
-                    preparedStatement3.setInt(1, bookedSeats - seatsBookedNow);
-                    preparedStatement3.setInt(2, classId);
-                    preparedStatement3.executeUpdate();
+                    int bookedSeats = seatsResultSet.getInt("booked_seats");
+                    int seatsBookedNow = bookingDetailsResultSet.getInt("seats_booked");
+                    updateSeatsStatement.setInt(1, bookedSeats - seatsBookedNow);
+                    updateSeatsStatement.setInt(2, classId);
+                    updateSeatsStatement.executeUpdate();
                     //deleting record from bookings table using booking id
-                    preparedStatement1.setInt(1, bookingId);
-                    preparedStatement1.executeUpdate();
+                    cancelBookingStatement.setInt(1, bookingId);
+                    cancelBookingStatement.executeUpdate();
                 }
             }
         } catch (SQLException e) {
@@ -215,11 +196,10 @@ public class GymDaoImpl implements GymDao {
     //RETRIEVING MEMBER DETAILS USING MEMBER ID
     @Override
     public void viewMembershipDetails(int memberId) {
-        try (PreparedStatement preparedStatement = connection.prepareStatement(RETRIEVE_MEMBERSHIP_DETAILS_QUERY)
-        ) {
+        try (PreparedStatement fetchMembershipDetailsStatement = connection.prepareStatement(RETRIEVE_MEMBERSHIP_DETAILS_QUERY)) {
 
-            preparedStatement.setInt(1, memberId);
-            ResultSet resultSet = preparedStatement.executeQuery();
+            fetchMembershipDetailsStatement.setInt(1, memberId);
+            ResultSet resultSet = fetchMembershipDetailsStatement.executeQuery();
             if (resultSet.next()) {
                 System.out.println("Member Id: " + memberId);
                 System.out.println("Member Name: " + resultSet.getString("name"));
@@ -237,9 +217,7 @@ public class GymDaoImpl implements GymDao {
     //FETCHING BOOK HISTORY
     @Override
     public void bookingDetails(int memberId) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(RETRIEVE_BOOKING_DETAILS_QUERY)
-        ) {
+        try (PreparedStatement preparedStatement = connection.prepareStatement(RETRIEVE_BOOKING_DETAILS_QUERY)) {
             preparedStatement.setInt(1, memberId);
             ResultSet resultSet = preparedStatement.executeQuery();
             boolean hasBooking = false;
@@ -263,8 +241,7 @@ public class GymDaoImpl implements GymDao {
     //UPGRADING THE MEMBERSHIP TYPE USING MEMBER ID AND MEMBERSHIP TYPE
     @Override
     public void upgradeMembership(int memberId, String membershipType) {
-        try (PreparedStatement preparedStatement = connection.prepareStatement(UPDATE_QUERY)
-        ) {
+        try (PreparedStatement preparedStatement = connection.prepareStatement(UPDATE_QUERY)) {
 
             preparedStatement.setInt(2, memberId);
             preparedStatement.setString(1, membershipType);
@@ -283,8 +260,7 @@ public class GymDaoImpl implements GymDao {
         try (Statement statement = connection.createStatement(); //this statement executes active members
              Statement statement1 = connection.createStatement(); //this statement executes most booked class
              Statement statement2 = connection.createStatement(); //this statement executes membership type distribution
-             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file))
-        ) {
+             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file))) {
             //fetching number of active numbers
             ResultSet resultSet = statement.executeQuery(RETRIEVE_ACTIVE_MEMBERS_QUERY);
             if (resultSet.next()) {
