@@ -25,6 +25,7 @@ public interface GymDao {
     boolean exitsBookingId(int bookingId);
 
     int getClassIdByName(String className);
+    int getAvailableSeats(int classId);
 }
 
 

@@ -10,6 +10,12 @@ import java.sql.*;
 
 public class GymDaoImpl implements GymDao {
     private static final Logger logger = Logger.getLogger(GymDaoImpl.class.getName());
+    static Connection connection;
+
+    static {
+        connection = ConnectorFactory.getConnection();
+    }
+
     //NEW REGISTRATION AND UPGRADATION QUERIES
     private static final String INSERT_QUERY = "insert into members (member_id,name,contact_info,membership_type,membership_start_date,membership_end_date) values(?,?,?,?,?,?)";
     private static final String UPDATE_QUERY = "update members set membership_type= ? where member_id = ?";
@@ -36,16 +42,9 @@ public class GymDaoImpl implements GymDao {
     //REGISTERING NEW USER
     @Override
     public void registerNewMember(Member member) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(INSERT_QUERY)
+        try (
+                PreparedStatement preparedStatement = connection.prepareStatement(INSERT_QUERY)
         ) {
-            if (getMemberById(member.getMemberId()) != false) {
-                logger.info("Member with " + member.getMemberId() + " has already membership.\n Please enter another one");
-                return;
-            }
-            if (member.getMemberName().length() > 20) {
-                logger.info("Member Name length should not exceed 20 characters");
-            }
             preparedStatement.setInt(1, member.getMemberId());
             preparedStatement.setString(2, member.getMemberName());
             preparedStatement.setString(3, member.getMailId());
@@ -65,12 +64,11 @@ public class GymDaoImpl implements GymDao {
     //CHECKS WHETHER GIVEN MEMBER ID IS PRESENT OR NOT IN MEMBERS TABLE
     @Override
     public boolean getMemberById(int memberId) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(GET_MEMBER_BY_ID_QUERY)
+        try (
+                PreparedStatement preparedStatement = connection.prepareStatement(GET_MEMBER_BY_ID_QUERY)
         ) {
             preparedStatement.setInt(1, memberId);
             ResultSet resultSet = preparedStatement.executeQuery();
-
             if (resultSet.next()) {
                 return true;
             }
@@ -84,8 +82,8 @@ public class GymDaoImpl implements GymDao {
     //CHECKS WHETHER GIVEN BOOKING ID IS PRESENT OR NOT IN  BOOKINGS TABLE
     @Override
     public boolean exitsBookingId(int bookingId) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(SELECT_CLASS_ID_QUERY)
+        try (
+                PreparedStatement preparedStatement = connection.prepareStatement(SELECT_CLASS_ID_QUERY)
         ) {
             preparedStatement.setInt(1, bookingId);
             ResultSet resultSet = preparedStatement.executeQuery();
@@ -99,9 +97,9 @@ public class GymDaoImpl implements GymDao {
     }
 
     //method to fetch available seats for a given class id.
-    private int getAvailableSeats(int classId) {
+    @Override
+    public int getAvailableSeats(int classId) {
         try (
-                Connection connection = ConnectorFactory.getConnection();
                 PreparedStatement preparedStatement = connection.prepareStatement(SEATS_AVAILABLE_QUERY)
         ) {
             preparedStatement.setInt(1, classId);
@@ -123,7 +121,6 @@ public class GymDaoImpl implements GymDao {
 
     private void updateBookedSeats(int classId, int newBookedSeats) {
         try (
-                Connection connection = ConnectorFactory.getConnection();
                 PreparedStatement preparedStatement = connection.prepareStatement(CHANGING_SEATS_QUERY)
         ) {
             preparedStatement.setInt(1, newBookedSeats);
@@ -154,24 +151,10 @@ public class GymDaoImpl implements GymDao {
     //BOOKING A  CLASS USING CLASS ID, NO OF SEATS, MEMBER ID
     @Override
     public void bookClass(String className, int noOfSeats, int memberId) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(BOOK_QUERY);//this statement inserts data into books
+        try (PreparedStatement preparedStatement = connection.prepareStatement(BOOK_QUERY);//this statement inserts data into books
              PreparedStatement selectSeatsStmt = connection.prepareStatement(SEATS_AVAILABLE_QUERY)
         ) {
             int classId = getClassIdByName(className);
-            if (classId == 0) {
-                logger.info("Sorry your class name is invalid. Enter the correct class name.");
-                return;
-            }
-            int availableSeats = getAvailableSeats(classId);
-            if (availableSeats < noOfSeats) {
-                logger.info("Not Enough seats available. We have only " + availableSeats + " available seats");
-                return;
-            }
-            if (getMemberById(memberId) == false) {
-                logger.info("Invalid member id. Please enter the correct one");
-                return;
-            }
             selectSeatsStmt.setInt(1, classId);
             ResultSet resultSet = selectSeatsStmt.executeQuery();
             if (resultSet.next()) {
@@ -196,17 +179,14 @@ public class GymDaoImpl implements GymDao {
     //CANCELLING A CLASS USING BOOKING ID
     @Override
     public void cancelBooking(int bookingId) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(SELECT_CLASS_ID_QUERY);
+        try (PreparedStatement preparedStatement = connection.prepareStatement(SELECT_CLASS_ID_QUERY);
              PreparedStatement preparedStatement1 = connection.prepareStatement(CANCEL_BOOKING_QUERY);
              PreparedStatement preparedStatement2 = connection.prepareStatement(SEATS_AVAILABLE_QUERY);
              PreparedStatement preparedStatement3 = connection.prepareStatement(CHANGING_SEATS_QUERY)
         ) {
             preparedStatement.setInt(1, bookingId);
             ResultSet resultSet = preparedStatement.executeQuery();
-            if (!exitsBookingId(bookingId)) {
-                logger.info("Sorry given booking id doesn't exists. Please enter the existing one");
-            }
+
             if (resultSet.next()) {
                 //extracting class id using booking id
                 int classId = resultSet.getInt("class_id");
@@ -235,13 +215,9 @@ public class GymDaoImpl implements GymDao {
     //RETRIEVING MEMBER DETAILS USING MEMBER ID
     @Override
     public void viewMembershipDetails(int memberId) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(RETRIEVE_MEMBERSHIP_DETAILS_QUERY)
+        try (PreparedStatement preparedStatement = connection.prepareStatement(RETRIEVE_MEMBERSHIP_DETAILS_QUERY)
         ) {
-            if (getMemberById(memberId) == false) {
-                logger.info("Sorry. There is no membership with this id.Please enter existing one");
-                return;
-            }
+
             preparedStatement.setInt(1, memberId);
             ResultSet resultSet = preparedStatement.executeQuery();
             if (resultSet.next()) {
@@ -261,9 +237,8 @@ public class GymDaoImpl implements GymDao {
     //FETCHING BOOK HISTORY
     @Override
     public void bookingDetails(int memberId) {
-        try (
-                Connection connection = ConnectorFactory.getConnection();
-                PreparedStatement preparedStatement = connection.prepareStatement(RETRIEVE_BOOKING_DETAILS_QUERY)
+        try (Connection connection = ConnectorFactory.getConnection();
+             PreparedStatement preparedStatement = connection.prepareStatement(RETRIEVE_BOOKING_DETAILS_QUERY)
         ) {
             preparedStatement.setInt(1, memberId);
             ResultSet resultSet = preparedStatement.executeQuery();
@@ -288,13 +263,9 @@ public class GymDaoImpl implements GymDao {
     //UPGRADING THE MEMBERSHIP TYPE USING MEMBER ID AND MEMBERSHIP TYPE
     @Override
     public void upgradeMembership(int memberId, String membershipType) {
-        try (Connection connection = ConnectorFactory.getConnection();
-             PreparedStatement preparedStatement = connection.prepareStatement(UPDATE_QUERY)
+        try (PreparedStatement preparedStatement = connection.prepareStatement(UPDATE_QUERY)
         ) {
-            if (getMemberById(memberId) == false) {
-                System.err.println("Sorry. There is no membership with this id.Please enter existing one");
-                return;
-            }
+
             preparedStatement.setInt(2, memberId);
             preparedStatement.setString(1, membershipType);
             preparedStatement.executeUpdate();
@@ -309,12 +280,10 @@ public class GymDaoImpl implements GymDao {
     @Override
     public void generateReport() {
         File file = new File("GymManagement");
-        try (
-                Connection connection = ConnectorFactory.getConnection();
-                Statement statement = connection.createStatement(); //this statement executes active members
-                Statement statement1 = connection.createStatement(); //this statement executes most booked class
-                Statement statement2 = connection.createStatement(); //this statement executes membership type distribution
-                BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file))
+        try (Statement statement = connection.createStatement(); //this statement executes active members
+             Statement statement1 = connection.createStatement(); //this statement executes most booked class
+             Statement statement2 = connection.createStatement(); //this statement executes membership type distribution
+             BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file))
         ) {
             //fetching number of active numbers
             ResultSet resultSet = statement.executeQuery(RETRIEVE_ACTIVE_MEMBERS_QUERY);
