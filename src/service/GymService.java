@@ -33,10 +33,12 @@ public class GymService {
 
     // REGISTRATION FOR THE NEW MEMBERSHIP
     public void newRegistration(Member member) {
+        //checking whether member id exits
         if (gymDao.getMemberById(member.getMemberId()) != false) {
             logger.info("Member with " + member.getMemberId() + " has already membership.\n Please enter another one");
             return;
         }
+        //checking the length of name
         if (member.getMemberName().length() > 20) {
             logger.info("Member Name length should not exceed 20 characters");
         }
@@ -46,15 +48,18 @@ public class GymService {
     // BOOKING A CLASS
     public void bookClass(String className, int noOfSeats, int memberId) {
         int classId = gymDao.getClassIdByName(className);
+        //checking whether the class name exits or not
         if (classId == 0) {
             logger.info("Sorry your class name is invalid. Enter the correct class name.");
             return;
         }
         int availableSeats = gymDao.getAvailableSeats(classId);
+        //checking the availability of seats
         if (availableSeats < noOfSeats) {
             logger.info("Not Enough seats available. We have only " + availableSeats + " available seats");
             return;
         }
+        //checking the member id valid or not
         if (gymDao.getMemberById(memberId) == false) {
             logger.info("Invalid member id. Please enter the correct one");
             return;
@@ -64,6 +69,7 @@ public class GymService {
 
     // CANCELLING A CLASS BOOKING
     public void cancelBooking(int bookingId) {
+        //checking whether booking id exists or not
         if (!gymDao.exitsBookingId(bookingId)) {
             logger.info("Sorry given booking id doesn't exists. Please enter the existing one");
         }
@@ -73,6 +79,7 @@ public class GymService {
 
     // FETCH THE DETAILS OF MEMBER
     public void viewMembershipDetails(int memberId) {
+        //checking whether the member id exits or not
         if (gymDao.getMemberById(memberId) == false) {
             logger.info("Sorry. There is no membership with this id.Please enter existing one");
             return;
@@ -83,6 +90,7 @@ public class GymService {
 
     // UPDATING THE EXISTED MEMBERSHIP TYPE
     public void upgradeMembershipType(int memberId, String updatedMembershipType) {
+        //checking whether the member id exits or not
         if (gymDao.getMemberById(memberId) == false) {
             System.err.println("Sorry. There is no membership with this id.Please enter existing one");
             return;
@@ -99,7 +107,7 @@ public class GymService {
 
     // VALIDATING THE CONTACT INFORMATION
     public static boolean validateContactInfo(String contactInfo) {
-        String mailRegex = "[a-zA-Z0-9][a-zA-Z0-9_.]*@[a-zA-Z]+[.[a-zA-Z]+]+";
+        String mailRegex = "[a-zA-Z0-9][a-zA-Z0-9_.]*@[a-zA-Z]+[.[a-zA-Z]+]+";//pattern for all mails
         Pattern pattern = Pattern.compile(mailRegex);
         Matcher matcher = pattern.matcher(contactInfo);
         return matcher.matches();
